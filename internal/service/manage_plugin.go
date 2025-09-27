@@ -2,8 +2,10 @@ package service
 
 import (
 	"errors"
+	"sort"
 	"time"
 
+	"github.com/langgenius/dify-plugin-daemon/internal/core/plugin_manager"
 	"github.com/langgenius/dify-plugin-daemon/internal/db"
 	"github.com/langgenius/dify-plugin-daemon/internal/types/exception"
 	"github.com/langgenius/dify-plugin-daemon/internal/types/models"
@@ -97,8 +99,8 @@ func ListPlugins(tenant_id string, page int, page_size int) *entities.Response {
 	}
 
 	finalData := responseData{
-		List: 	data,
-		Total: 	totalCount,
+		List:  data,
+		Total: totalCount,
 	}
 
 	return entities.NewSuccessResponse(finalData)
@@ -572,4 +574,70 @@ func GetDatasource(tenant_id string, plugin_id string, provider string) *entitie
 		DatasourceInstallation: datasource,
 		Declaration:            declaration.Datasource,
 	})
+}
+
+type RuntimeConnectionDetail struct {
+	PluginUniqueIdentifier string `json:"plugin_unique_identifier"`
+	Connections            int64  `json:"connections"`
+}
+
+type PluginRuntimeConnectionSnapshot struct {
+	PluginID         string                    `json:"plugin_id"`
+	TotalConnections int64                     `json:"total_connections"`
+	BlueGreen        bool                      `json:"blue_green"`
+	NewVersion       *RuntimeConnectionDetail  `json:"new_version,omitempty"`
+	OldVersions      []RuntimeConnectionDetail `json:"old_versions,omitempty"`
+}
+
+type PluginRuntimeConnectionsResponse struct {
+	List []PluginRuntimeConnectionSnapshot `json:"list"`
+}
+
+func ListPluginRuntimeConnections(pluginID string) *entities.Response {
+	manager := plugin_manager.Manager()
+	reports := manager.CollectRuntimeTraffic(pluginID)
+
+	grouped := map[string]*PluginRuntimeConnectionSnapshot{}
+
+	for _, report := range reports {
+		snapshot, exists := grouped[report.PluginID]
+		if !exists {
+			snapshot = &PluginRuntimeConnectionSnapshot{
+				PluginID:    report.PluginID,
+				OldVersions: make([]RuntimeConnectionDetail, 0),
+			}
+			grouped[report.PluginID] = snapshot
+		}
+
+		detail := RuntimeConnectionDetail{
+			PluginUniqueIdentifier: report.Identity,
+			Connections:            report.Sessions,
+		}
+
+		snapshot.TotalConnections += report.Sessions
+
+		if report.Draining {
+			snapshot.BlueGreen = true
+			snapshot.OldVersions = append(snapshot.OldVersions, detail)
+			continue
+		}
+
+		if snapshot.NewVersion == nil {
+			snapshot.NewVersion = &detail
+		} else {
+			// multiple non-draining runtimes are unexpected, but treat them as additional versions
+			snapshot.OldVersions = append(snapshot.OldVersions, detail)
+		}
+	}
+
+	list := make([]PluginRuntimeConnectionSnapshot, 0, len(grouped))
+	for _, snapshot := range grouped {
+		list = append(list, *snapshot)
+	}
+
+	sort.Slice(list, func(i, j int) bool {
+		return list[i].PluginID < list[j].PluginID
+	})
+
+	return entities.NewSuccessResponse(PluginRuntimeConnectionsResponse{List: list})
 }

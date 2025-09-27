@@ -15,6 +15,7 @@ func (p *PluginManager) InstallToLocal(
 	plugin_unique_identifier plugin_entities.PluginUniqueIdentifier,
 	source string,
 	meta map[string]any,
+	options InstallOptions,
 ) (
 	*stream.Stream[PluginInstallResponse], error,
 ) {
@@ -28,7 +29,7 @@ func (p *PluginManager) InstallToLocal(
 		return nil, err
 	}
 
-	runtime, launchedChan, errChan, err := p.launchLocal(plugin_unique_identifier)
+	runtime, launchedChan, errChan, err := p.launchLocal(plugin_unique_identifier, options)
 	if err != nil {
 		return nil, err
 	}

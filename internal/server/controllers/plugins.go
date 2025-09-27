@@ -122,6 +122,7 @@ func InstallPluginFromIdentifiers(app *app.Config) gin.HandlerFunc {
 			PluginUniqueIdentifiers []plugin_entities.PluginUniqueIdentifier `json:"plugin_unique_identifiers" validate:"required,max=64,dive,plugin_unique_identifier"`
 			Source                  string                                   `json:"source" validate:"required"`
 			Metas                   []map[string]any                         `json:"metas" validate:"omitempty"`
+			BlueGreen               bool                                     `json:"blue_green"`
 		}) {
 			if request.Metas == nil {
 				request.Metas = []map[string]any{}
@@ -143,7 +144,7 @@ func InstallPluginFromIdentifiers(app *app.Config) gin.HandlerFunc {
 			}
 
 			c.JSON(http.StatusOK, service.InstallPluginFromIdentifiers(
-				app, request.TenantID, request.PluginUniqueIdentifiers, request.Source, request.Metas,
+				app, request.TenantID, request.PluginUniqueIdentifiers, request.Source, request.Metas, request.BlueGreen,
 			))
 		})
 	}
@@ -273,5 +274,14 @@ func FetchMissingPluginInstallations(c *gin.Context) {
 		PluginUniqueIdentifiers []plugin_entities.PluginUniqueIdentifier `json:"plugin_unique_identifiers" validate:"required,max=256,dive,plugin_unique_identifier"`
 	}) {
 		c.JSON(http.StatusOK, service.FetchMissingPluginInstallations(request.TenantID, request.PluginUniqueIdentifiers))
+	})
+}
+
+func ListPluginRuntimeConnections(c *gin.Context) {
+	BindRequest(c, func(request struct {
+		TenantID string `uri:"tenant_id" validate:"required"`
+		PluginID string `form:"plugin_id" validate:"omitempty"`
+	}) {
+		c.JSON(http.StatusOK, service.ListPluginRuntimeConnections(request.PluginID))
 	})
 }

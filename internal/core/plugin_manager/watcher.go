@@ -49,6 +49,7 @@ func (p *PluginManager) startRemoteWatcher(config *app.Config) {
 					return
 				}
 				p.m.Store(identity.String(), rpr)
+				p.registerRuntime(identity, registerRuntimeOptions{})
 				routine.Submit(map[string]string{
 					"module":    "plugin_manager",
 					"function":  "startRemoteWatcher",
@@ -60,6 +61,7 @@ func (p *PluginManager) startRemoteWatcher(config *app.Config) {
 							log.Error("plugin runtime error: %v", err)
 						}
 						p.m.Delete(identity.String())
+						p.cleanupRuntime(identity.String())
 					}()
 					p.fullDuplexLifecycle(rpr, nil, nil)
 				})
@@ -103,7 +105,7 @@ func (p *PluginManager) handleNewLocalPlugins(config *app.Config) {
 				wg.Done()
 			}()
 
-			_, launchedChan, errChan, err := p.launchLocal(currentPlugin)
+			_, launchedChan, errChan, err := p.launchLocal(currentPlugin, InstallOptions{})
 			if err != nil {
 				log.Error("launch local plugin failed: %s", err.Error())
 				return

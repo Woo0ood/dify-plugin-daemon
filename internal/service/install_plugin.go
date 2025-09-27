@@ -47,6 +47,7 @@ func doInstallPluginRuntime(
 	source string,
 	pluginUniqueIdentifier plugin_entities.PluginUniqueIdentifier,
 	meta map[string]any,
+	blueGreen bool,
 	task *models.InstallTask,
 	declaration *plugin_entities.PluginDeclaration,
 	reinstall bool,
@@ -153,13 +154,24 @@ func doInstallPluginRuntime(
 		if reinstall {
 			stream, err = manager.ReinstallToServerlessFromPkg(pkgFile, zipDecoder)
 		} else {
-			stream, err = manager.InstallToServerlessFromPkg(pkgFile, zipDecoder, source, meta)
+			stream, err = manager.InstallToServerlessFromPkg(
+				pkgFile,
+				zipDecoder,
+				source,
+				meta,
+				plugin_manager.InstallOptions{BlueGreen: blueGreen},
+			)
 		}
 	} else if config.Platform == app.PLATFORM_LOCAL {
 		if reinstall {
 			log.Warn("reinstall is not supported on local platform, will do install")
 		}
-		stream, err = manager.InstallToLocal(pluginUniqueIdentifier, source, meta)
+		stream, err = manager.InstallToLocal(
+			pluginUniqueIdentifier,
+			source,
+			meta,
+			plugin_manager.InstallOptions{BlueGreen: blueGreen},
+		)
 	} else {
 		updateTaskStatus(func(task *models.InstallTask, plugin *models.InstallTaskPluginStatus) {
 			task.Status = models.InstallTaskStatusFailed
@@ -244,6 +256,7 @@ func InstallPluginRuntimeToTenant(
 	plugin_unique_identifiers []plugin_entities.PluginUniqueIdentifier,
 	source string,
 	metas []map[string]any,
+	blueGreen bool,
 	onDone InstallPluginOnDoneHandler, // since installing plugin is a async task, we need to call it asynchronously
 ) (*InstallPluginResponse, error) {
 	response := &InstallPluginResponse{}
@@ -347,6 +360,7 @@ func InstallPluginRuntimeToTenant(
 				source,
 				pluginUniqueIdentifier,
 				metas[i],
+				blueGreen,
 				task,
 				declaration,
 				false,
@@ -367,6 +381,7 @@ func InstallPluginFromIdentifiers(
 	plugin_unique_identifiers []plugin_entities.PluginUniqueIdentifier,
 	source string,
 	metas []map[string]any,
+	blueGreen bool,
 ) *entities.Response {
 	response, err := InstallPluginRuntimeToTenant(
 		config,
@@ -374,6 +389,7 @@ func InstallPluginFromIdentifiers(
 		plugin_unique_identifiers,
 		source,
 		metas,
+		blueGreen,
 		func(
 			pluginUniqueIdentifier plugin_entities.PluginUniqueIdentifier,
 			declaration *plugin_entities.PluginDeclaration,
@@ -460,6 +476,7 @@ func ReinstallPluginFromIdentifier(
 				plugin.Source,
 				pluginUniqueIdentifier,
 				map[string]any{},
+				false,
 				task,
 				pluginDeclaration,
 				true,
@@ -558,6 +575,7 @@ func UpgradePlugin(
 		[]plugin_entities.PluginUniqueIdentifier{new_plugin_unique_identifier},
 		source,
 		[]map[string]any{meta},
+		false,
 		func(
 			pluginUniqueIdentifier plugin_entities.PluginUniqueIdentifier,
 			declaration *plugin_entities.PluginDeclaration,

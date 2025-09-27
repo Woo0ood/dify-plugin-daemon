@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/langgenius/dify-cloud-kit/oss"
 	"github.com/langgenius/dify-plugin-daemon/internal/core/dify_invocation"
@@ -26,6 +27,13 @@ import (
 
 type PluginManager struct {
 	m mapping.Map[string, plugin_entities.PluginLifetime]
+
+	// runtimeSessions tracks the active traffic for each plugin runtime.
+	runtimeSessions sync.Map // map[string]*runtimeTrafficState
+
+	// runtimePluginIDs keeps a mapping from runtime identity to plugin id for
+	// blue-green replacement bookkeeping.
+	runtimePluginIDs sync.Map // map[string]string
 
 	// mediaBucket is used to manage media files like plugin icons, images, etc.
 	mediaBucket *media_transport.MediaBucket
